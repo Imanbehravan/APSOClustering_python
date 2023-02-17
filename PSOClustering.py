@@ -6,7 +6,19 @@ import matplotlib.pyplot as plt
 
 def costFunction(data, centers):
     labels = assignLabels(data, centers)
-    cost = metrics.calinski_harabasz_score(data, labels)
+    unique_labels = np.unique(labels)
+    # if (len(unique_labels) == 1):
+    #     check = True
+    #     while check:
+    #         new_label = np.random.randint(0, len(centers), 1)
+    #         if new_label[0] != unique_labels[0]:
+    #             labels[0] = new_label[0]
+    #             check = False
+    if (len(unique_labels) == 1):
+        cost = float('inf')
+    else:
+        metric_value = metrics.calinski_harabasz_score(data, labels)
+        cost = 1/metric_value
     return cost
 
 
@@ -34,12 +46,19 @@ def chooseNearestSample(particle, data):
         minimum_dist = min(sampleDist)
         minimum_dist_index = sampleDist.index(minimum_dist)
         nearestSample[i] = data.loc[minimum_dist_index]
+        if i > 0:
+            for h in range(i-1):
+                if (all(nearestSample[i]) == all(nearestSample[h])):
+                    nearestSample[i] = data.sample()
+
     return nearestSample
 
 
 
 
-def PSO_Clustering(dataset, clusterNum, popNum, MaxIt, isPlot):
+def PSO_Clustering(dataset, clusterNum, popNum, MaxIt, isPlot, numRepSamples, stage, i, j):
+    if stage == 1:
+        print("stage: ", stage,  "------------- sequence: ", i+1, "-------------- step: ", j+1)
     dimension = clusterNum * len(dataset.axes[1])
     pop = []
     cost = []
@@ -78,7 +97,7 @@ def PSO_Clustering(dataset, clusterNum, popNum, MaxIt, isPlot):
                 particle = particle.reshape(1, dimension)
                 particle_velocity[i] = w*particle_velocity[i] + c1 * np.random.rand()*(pbestPos[i].reshape(1,dimension) - particle) + c2*np.random.rand()*(globalPos.reshape(1,dimension) - particle)
                 particle = particle + particle_velocity[i]
-                pop[i] = chooseNearestSample(particle.reshape(clusterNum, len(dataset.axes[1])), dataset)
+                pop[i] = chooseNearestSample(particle.reshape(clusterNum, len(dataset.axes[1])), dataset.sample(n=int(numRepSamples*len(dataset)), ignore_index=True))
                 cost[i] = costFunction(dataset, pop[i])
                 if (cost[i]<pbestCost[i]):
                     pbestCost[i] = cost[i]
@@ -91,6 +110,8 @@ def PSO_Clustering(dataset, clusterNum, popNum, MaxIt, isPlot):
             globaCost_it.append(globalCost)
             averageCost_it.append(np.mean(cost))
             w = wdamp * w
+            if stage == 2:
+                print("---------- stage: ", stage, "---------- iteration: ", it+1 )
             #print([" iteration: ", it, "bestcost: ", globalCost])
 
     if (isPlot):
