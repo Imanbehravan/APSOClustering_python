@@ -2,48 +2,96 @@ from PSOClustering import PSO_Clustering
 import pandas as pd
 import numpy as np
 import math
+from sklearn.metrics import rand_score
+from PSOClustering import assignLabels
 
 
 
-def runSequence(data, popNum, MaxIt, numOfSequence, sequenceSteps):
+def runSequence(data, popNum, MaxIt, numOfSequence, sequenceSteps, numRepSamples):
+    sequences_BestK = []
+    sequences_BestCost = []
     for i in range(numOfSequence):
         bestK_list = []
         bestCost_list =[]
         for j in range(sequenceSteps):
-            print("------sequence num: ", i,'----- sequence step: ', j )
             if (j == 0):
                 k = np.random.randint(2, math.sqrt(len(data)))
                 bestKSofar = k
                 bestK_list.append(bestKSofar)
-                cost, pos = PSO_Clustering(data, k, popNum, MaxIt, True)
+                cost, pos = PSO_Clustering(data, k, popNum, MaxIt, False, numRepSamples, 1, i, j)
                 bestCostSofar = cost
                 bestCost_list.append(bestCostSofar)
-                print("cost: ", cost)
-                print("pos: ", pos)
             else:
-                k = k + np.random.randint(-10, 10)
+                k = k + np.random.randint(-3, 3)
                 if (k < 2):
                     k = 2
-                cost, pos = PSO_Clustering(data, k, popNum, MaxIt, True)
+                cost, pos = PSO_Clustering(data, k, popNum, MaxIt, False, numRepSamples, 1, i, j)
                 if (cost < bestCostSofar):
                     bestCostSofar = cost
                     bestKSofar = k
                 bestK_list.append(bestKSofar)
                 bestCost_list.append(bestCostSofar)
-        print("best k list: ", bestK_list)
-        print("best cost list: ", bestCost_list)
-        iman_breakPoint = 13
+        bestk_index = bestCost_list.index(min(bestCost_list))
+        sequences_BestK.append(bestK_list[bestk_index])
+        sequences_BestCost.append(min(bestCost_list))
+    iman_breakPoint = 13
+    finalBestK = sequences_BestK[sequences_BestCost.index(min(sequences_BestCost))]
+    return finalBestK
+
 
 
 if __name__ == '__main__':
     sequenceNum = 3
-    sequenceSteps = 5
-    sequence_PSOPup = 5
-    sequence_MaxIt = 10
+    sequenceSteps = 10
+    sequence_PSOPop = 5
+    sequence_MaxIt = 50
+    secondStage_PSOpop = 5
+    secondStage_MaxIt = 150
+    numRepSamples = 0.1
+    rand_index_flag = True
+    centroids = []
+    outputfile = "/home/iman/projects/My_Projects/python_projects/APSOClustering/result.txt"
     dataset = pd.read_csv('Iman_Data', names = ["f1", "f2", "f3", "targets"])
-    target = dataset["targets"]
+    if rand_index_flag:
+        target = dataset["targets"]
     trainDataset = dataset.drop(columns=["targets"])
-    bestK = runSequence(trainDataset, sequence_PSOPup, sequence_MaxIt, sequenceNum, sequenceSteps)
+    bestK = runSequence(trainDataset, sequence_PSOPop, sequence_MaxIt, sequenceNum, sequenceSteps, numRepSamples)
+    finalBestCost, finalCentroids = PSO_Clustering(trainDataset, bestK, secondStage_PSOpop, secondStage_MaxIt, True, numRepSamples, 2, 0, 0)
+    predLabels = assignLabels(trainDataset, finalCentroids)
+    index = 1
+    for i in range(bestK):
+        if predLabels.count(i) > 0:
+            centroids.append(finalCentroids[i])
+            print("number of elements in cluster ", index, "is: ", predLabels.count(i))
+            index = index + 1
+    print("best number of clusters: ", len(centroids))
+    print("best centroids: ", centroids)
+    if rand_index_flag:
+        rand_index = rand_score(target, predLabels)
+        print("rand index: ", rand_index)
+
+    f = open(outputfile, "w")
+    f.write("number of centroids: ")
+    f.write(str(len(centroids)))
+    f.write('\n')
+    f.write('\n')
+    f.write("centroids: ")
+    f.write('\n')
+    np.savetxt(f, centroids)
+    #f.write(finalCentroids)
+    f.write('\n')
+    f.write("cost: ")
+    #np.savetxt(f,finalBestCost)
+    f.write(str(finalBestCost))
+    f.write('\n')
+    f.write("Rand index: ")
+    if rand_index_flag:
+        f.write(str(rand_index))
+
+    else:
+        f.write("not calculated")
+
+    f.close()
 
 
 
